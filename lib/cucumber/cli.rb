@@ -23,7 +23,7 @@ module Cucumber
     end
     
     attr_reader :options
-    FORMATS = %w{pretty profile progress html}
+    FORMATS = %w{pretty profile progress html doc}
     DEFAULT_FORMAT = 'pretty'
     
     def initialize
@@ -190,6 +190,8 @@ module Cucumber
           formatter_broadcaster.register(Formatters::ProfileFormatter.new(output_broadcaster, step_mother))
         when 'html'
           formatter_broadcaster.register(Formatters::HtmlFormatter.new(output_broadcaster, step_mother))
+        when 'doc'
+          formatter_broadcaster.register(Formatters::DocFormatter.new(output_broadcaster, step_mother))
         else
           raise "Unknown formatter: #{@options[:format]}"
         end
