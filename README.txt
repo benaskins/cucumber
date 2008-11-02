@@ -1,6 +1,6 @@
 = Cucumber
 
-* http://github.com/aslakhellesoy/cucumber
+* http://github.com/aslakhellesoy/cucumber - TEST UPDATE FROM SUBMODULE
 
 == DESCRIPTION:
 
