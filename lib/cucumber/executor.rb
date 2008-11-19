@@ -4,10 +4,7 @@ module Cucumber
   class Executor
     attr_reader :failed
     attr_accessor :formatters
-
-    def line=(line)
-      @line = line
-    end
+    attr_writer :scenario_names, :lines_for_features
 
     def initialize(step_mother)
       @world_proc = lambda do
@@ -17,6 +14,9 @@ module Cucumber
       @after_scenario_procs = []
       @after_step_procs = []
       @step_mother = step_mother
+
+      @executed_scenarios = {}
+      @regular_scenario_cache = {}
     end
 
     def register_world_proc(&proc)
@@ -39,15 +39,20 @@ module Cucumber
     end
 
     def visit_features(features)
-      raise "Line number can only be specified when there is 1 feature. There were #{features.length}." if @line && features.length != 1
       formatters.visit_features(features)
       features.accept(self)
       formatters.dump
     end
 
     def visit_feature(feature)
-      formatters.visit_feature(feature)
-      feature.accept(self)
+      @feature_file = feature.file
+            
+      if accept_feature?(feature)
+        formatters.feature_executing(feature)
+        feature.accept(self)
+        @executed_scenarios = {}
+        @regular_scenario_cache = {}
+      end
     end
 
     def visit_header(header)
@@ -55,32 +60,44 @@ module Cucumber
     end
 
     def visit_row_scenario(scenario)
+      execute_scenario(@regular_scenario_cache[scenario.name]) if executing_unprepared_row_scenario?(scenario)
       visit_scenario(scenario)
     end
 
     def visit_regular_scenario(scenario)
+      @regular_scenario_cache[scenario.name] = scenario
       visit_scenario(scenario)
     end
 
     def visit_scenario(scenario)
-      if accept?(scenario)
-        @error = nil
-        @pending = nil
-
-        @world = @world_proc.call
-        @world.extend(Spec::Matchers) if defined?(Spec::Matchers)
-        define_step_call_methods(@world)
-
-        formatters.scenario_executing(scenario)
-        @before_scenario_procs.each{|p| p.call_in(@world, *[])}
-        scenario.accept(self)
-        @after_scenario_procs.each{|p| p.call_in(@world, *[])}
-        formatters.scenario_executed(scenario)
+      if accept_scenario?(scenario)
+        @executed_scenarios[scenario.name] = true
+        execute_scenario(scenario)
       end
     end
 
-    def accept?(scenario)
-      @line.nil? || scenario.at_line?(@line)
+    def execute_scenario(scenario)
+      @error = nil
+      @pending = nil
+
+      @world = @world_proc.call
+      @world.extend(Spec::Matchers) if defined?(Spec::Matchers)
+      define_step_call_methods(@world)
+
+      formatters.scenario_executing(scenario)
+      @before_scenario_procs.each{|p| p.call_in(@world, *[])}
+      scenario.accept(self)
+      @after_scenario_procs.each{|p| p.call_in(@world, *[])}
+      formatters.scenario_executed(scenario)
+    end
+    
+    def accept_scenario?(scenario)
+      scenario_at_specified_line?(scenario) &&
+      scenario_has_specified_name?(scenario)
+    end
+
+    def accept_feature?(feature)
+      feature.scenarios.any? { |s| accept_scenario?(s) }
     end
 
     def visit_row_step(step)
@@ -139,5 +156,30 @@ module Cucumber
         end
       end
     end
+    
+    def executing_unprepared_row_scenario?(scenario)
+      accept_scenario?(scenario) && !@executed_scenarios[scenario.name]
+    end
+    
+    def scenario_at_specified_line?(scenario)
+      if lines_defined_for_current_feature?
+        @lines_for_features[@feature_file].inject(false) { |at_line, line| at_line || scenario.at_line?(line) }
+      else
+        true
+      end
+    end
+    
+    def scenario_has_specified_name?(scenario)
+      if @scenario_names && !@scenario_names.empty?
+        @scenario_names.include?(scenario.name)
+      else
+        true
+      end
+    end
+    
+    def lines_defined_for_current_feature?
+      @lines_for_features && !@lines_for_features[@feature_file].nil? && !@lines_for_features[@feature_file].empty?
+    end
+    
   end
 end

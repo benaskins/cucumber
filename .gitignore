@@ -4,5 +4,7 @@ doc
 *.log
 *.pid
 .eprj
+.tmtags
 *~
 .DS_Store
+*.swp

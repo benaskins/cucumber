@@ -1,1 +1,1 @@
-%w{html pretty progress profile doc}.each{|n| require "cucumber/formatters/#{n}_formatter"}
+%w{html pretty progress profile autotest doc}.each{|n| require "cucumber/formatters/#{n}_formatter"}
